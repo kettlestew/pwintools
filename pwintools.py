@@ -823,10 +823,12 @@ class Process(windows.winobject.process.WinProcess):
             log.warning(str(e))
             return b''
 
-    def search(self, pattern, writable = False):
-        """search(pattern, writable = False) search pattern in all loaded modules (EXE + DLL) ; returns the addr (0 on error)"""
+    def search(self, pattern, writable=False):
+        """search(pattern, writable=False) searches pattern in all loaded modules (EXE + DLL); returns a list of addresses where the pattern is found (empty list if none found)."""
         if not self.check_initialized():
             raise Exception("Error: PEB not initialized while searching a pattern in memory")
+
+        addrlist = []  # List to store all matching addresses
 
         for module in self.peb.modules:
             try:
@@ -835,14 +837,16 @@ class Process(windows.winobject.process.WinProcess):
                         continue
                     for page in range(section.start, section.start + section.size, 0x1000):
                         try:
-                            pos = self.read_memory(page, min(0x1000, (section.start + section.size) - page)).find(pattern)
-                            if pos != -1:
-                                return page + pos
+                            chunk = self.read_memory(page, min(0x1000, (section.start + section.size) - page))
+                            pos = chunk.find(pattern)
+                            while pos != -1:
+                                addrlist.append(page + pos)
+                                pos = chunk.find(pattern, pos + 1)
                         except:
                             pass
             except:
                 pass
-        return 0
+        return addrlist
     
     @property
     def imports(self):
